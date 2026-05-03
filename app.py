@@ -31,52 +31,41 @@ st.markdown(f"""
 # --- 2. MOTEUR DE DONNÉES ---
 @st.cache_data
 def load_data():
-    file_path = "chhi_dashboard_dataset.csv"
+    file_path = "dashboard_kpi_hr.csv" 
     
     if os.path.exists(file_path):
-        # On lit le CSV (vérifiez si c'est une virgule ou un point-virgule)
-        df_raw = pd.read_csv(file_path)
+        # On ajoute sep=";" car le fichier utilise des points-virgules
+        df_raw = pd.read_csv(file_path, sep=";")
+
+        # Nettoyage des noms de colonnes pour enlever espaces ou caractères invisibles
+        df_raw.columns = df_raw.columns.str.strip()
         
-        # 1. Agrégation par année (Moyenne globale CACEIS)
-        # On ignore les colonnes 'Legal Entity' et 'Direction' pour tout grouper
-        df_grouped = df_raw.groupby("Year").agg({
-            "HCVA": "mean",
-            "KTI": "mean",
-            "Skill Decay": "mean",
-            "RE-Score": "mean",
-            "SPE": "mean",
-            "CHHI Index": "mean"
-        }).reset_index()
-
-        # 2. Ajustement des échelles (Basé sur votre exemple)
-        # Votre SPE est à 0.0053 -> on le passe en % (0.53%)
-        df_grouped["SPE"] = df_grouped["SPE"] * 100
-        
-        # Votre KTI est à 0.5 -> on le passe en % (50%)
-        df_grouped["KTI"] = df_grouped["KTI"] * 100
-
-        # Votre Skill Decay est à 0.0 -> on le laisse ou multiplie par 100
-        df_grouped["Skill Decay"] = df_grouped["Skill Decay"] * 100
-
-        df_grouped["RE-Score"] = df_grouped["RE-Score"] / 4
-
-        # 3. Renommage des colonnes pour le Dashboard
-        df_final = df_grouped.rename(columns={
-            "Year": "Year",
-            "HCVA": "HCVA (k€)",
-            "KTI": "KTI (%)",
-            "Skill Decay": "Skill Decay (%)",
-            "RE-Score": "RE-Score",
-            "SPE": "SPE (%)",
-            "CHHI Index": "CHHI Index"
+        # Renommage explicite
+        df_final = df_raw.rename(columns={
+            "year": "Year",
+            "hcva": "HCVA (k€)",
+            "kti_potentiel": "KTI (%)",
+            "re_score": "RE-Score",
+            "chhi_index_100": "CHHI Index"
         })
         
-        return df_final
+        # Conversion KTI en % (seulement si la colonne existe après le rename)
+        if "KTI (%)" in df_final.columns:
+            # On s'assure que les données sont numériques (au cas où le CSV soit mal lu)
+            df_final["KTI (%)"] = pd.to_numeric(df_final["KTI (%)"], errors='coerce')
+            
+            # On multiplie par 100 si c'est un ratio (ex: 0.82)
+            if df_final["KTI (%)"].max() <= 1.5: # On prend une marge
+                df_final["KTI (%)"] = df_final["KTI (%)"] * 100
+        
+        return df_final.round(2)
     else:
         st.error(f"Fichier '{file_path}' non trouvé.")
         return pd.DataFrame()
 
+# Chargement
 df = load_data()
+
 
 # --- 3. FONCTIONS D'AIDE ---
 def get_trend_ui(curr, prev, is_reverse=False, has_prev=True):
@@ -124,12 +113,12 @@ if app_mode == "Live Dashboard":
         df_prev = df[df['Year'] == selected_year - 1]
 
     kpis_config = [
-        {"id": "CHHI", "label": "Global Human Capital Score (CHHI)", "col": "CHHI Index", "unit": "%", "target": 80, "rev": False, "is_master": True, "def": "CACEIS Human Capital Health Index (CHHI)", "val": "Global Human Capital Score.", "form": "Weighted average of 5 KPIs.", "logic": ">80% (Green) / >64% (Yellow) / <64% (Red)"},
-        {"id": "HCVA", "label": "KPI 1: Productivity (HCVA)", "col": "HCVA (k€)", "unit": "k€", "target": 145, "rev": False, "is_master": False, "def": "Human Capital Value Added (HCVA) per FTE", "val": "Financial efficiency of human capital.", "form": "[GNP - (OpEx-Payroll)]/FTE", "logic": ">145k€ (Green) / >116k€ (Yellow) / <116k€ (Red)"},
-        {"id": "KTI", "label": "KPI 2: Knowledge (KTI)", "col": "KTI (%)", "unit": "%", "target": 75, "rev": False, "is_master": False, "def": "Knowledge Transfer Index (KTI)", "val": "Training ROI and skill application.", "form": "Reviews / Manager Assessment", "logic": ">75% (Green) / >60% (Yellow) / <60% (Red)"},
-        {"id": "SD", "label": "KPI 3: Risk (Skill Decay)", "col": "Skill Decay (%)", "unit": "%", "target": 15, "rev": True, "is_master": False, "def": "Skill Decay Rate (Obsolescence Index)", "val": "Risk of expertise erosion.", "form": "% without training > 18 months", "logic": "<12% (Green) / <18% (Yellow) / >18% (Red)"},
+        {"id": "CHHI", "label": "Global Human Capital Score (CHHI)", "col": "CHHI Index", "unit": "%", "target": 80, "rev": False, "is_master": True, "def": "CACEIS Human Capital Health Index (CHHI)", "val": "Global Human Capital Score.", "form": "Weighted average of all other KPIs.", "logic": ">80% (Green) / >64% (Yellow) / <64% (Red)"},
+        {"id": "HCVA", "label": "KPI 1: Productivity (HCVA)", "col": "HCVA (k€)", "unit": "k€", "target": 200, "rev": False, "is_master": False, "def": "Human Capital Value Added (HCVA) per FTE", "val": "Financial efficiency of human capital.", "form": "[GNP - (OpEx-Payroll)]/FTE", "logic": ">200k€ (Green) / >160k€ (Yellow) / <160k€ (Red)"},
+        {"id": "KTI", "label": "KPI 2: Knowledge (KTI)", "col": "KTI (%)", "unit": "%", "target": 75, "rev": False, "is_master": False, "def": "Knowledge Transfer Index (KTI)", "val": "Training ROI and skill application.", "form": " Σ(Activation Scores) / Nb Responses", "logic": ">75% (Green) / >60% (Yellow) / <60% (Red)"},
+        #{"id": "SD", "label": "KPI 3: Risk (Skill Decay)", "col": "Skill Decay (%)", "unit": "%", "target": 15, "rev": True, "is_master": False, "def": "Skill Decay Rate (Obsolescence Index)", "val": "Risk of expertise erosion.", "form": "% without training > 18 months", "logic": "<12% (Green) / <18% (Yellow) / >18% (Red)"},
         {"id": "RE", "label": "KPI 4: Resilience (RE-Score)", "col": "RE-Score", "unit": "/5", "target": 4.0, "rev": False, "is_master": False, "def": "Resilience & Engagement Score (RE-Score)", "val": "Workforce stability and morale.", "form": "Engagement / Absenteeism", "logic": ">4.0 (Green) / >3.2 (Yellow) / <3.2 (Red)"},
-        {"id": "SPE", "label": "KPI 5: Strategy (SPE)", "col": "SPE (%)", "unit": "%", "target": 25, "rev": False, "is_master": False, "def": "Strategic Payroll Elasticity (SPE)", "val": "Agility towards future-proof jobs.", "form": "% payroll growth roles", "logic": ">25% (Green) / >20% (Yellow) / <20% (Red)"}
+        #{"id": "SPE", "label": "KPI 5: Strategy (SPE)", "col": "SPE (%)", "unit": "%", "target": 25, "rev": False, "is_master": False, "def": "Strategic Payroll Elasticity (SPE)", "val": "Agility towards future-proof jobs.", "form": "% payroll growth roles", "logic": ">25% (Green) / >20% (Yellow) / <20% (Red)"}
     ]
 
     st.markdown("---")
@@ -205,49 +194,71 @@ if app_mode == "Live Dashboard":
     col_radar, col_table = st.columns([2, 1.2])
 
     with col_radar:
-        categories = ['Productivity (HCVA)', 'Knowledge (KTI)', 'Risk (Skill Decay)', 'Resilience (RE-Score)', 'Strategy (SPE)']
-        r_hcva = df_current['HCVA (k€)'].mean() / 145
-        r_kti = (df_current['KTI (%)'].mean() / 100) / 0.75
-        r_risk = 12 / df_current['Skill Decay (%)'].mean() 
-        r_re = df_current['RE-Score'].mean() / 4.0
-        r_spe = (df_current['SPE (%)'].mean() / 100) / 0.25
-        r_values = [r_hcva, r_kti, r_risk, r_re, r_spe]
+        categories = ['Productivity (HCVA)', 'Knowledge (KTI)', 'Resilience (RE-Score)']
+        #categories = ['Productivity (HCVA)', 'Knowledge (KTI)', 'Risk (Skill Decay)', 'Resilience (RE-Score)', 'Strategy (SPE)']
+        r_values = [
+            df_current['hcva_radar'].values[0],
+            df_current['kti_radar'].values[0],
+            df_current['re_radar'].values[0]
+        ]
 
         fig_radar = go.Figure()
-        fig_radar.add_trace(go.Scatterpolar(r=[1.0]*5 + [1.0], theta=categories + [categories[0]], fill='toself', fillcolor='rgba(136, 139, 141, 0.05)', line=dict(color=CACEIS_RED, dash='dash'), name='Target Threshold'))
+        # Ligne de cible (Target) fixe à 100%
+        fig_radar.add_trace(go.Scatterpolar(r=[100, 100, 100, 100], theta=categories + [categories[0]], fill='toself', fillcolor='rgba(136, 139, 141, 0.05)', line=dict(color=CACEIS_RED, dash='dash'), name='Target Threshold (100%)'))
+        # Performance Réelle (peut dépasser 100)
         fig_radar.add_trace(go.Scatterpolar(r=r_values + [r_values[0]], theta=categories + [categories[0]], fill='toself', fillcolor='rgba(136, 139, 141, 0.4)', line=dict(color=CACEIS_GREY, width=3), name='Actual Performance'))
-        fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 1.5])), showlegend=True, height=450, margin=dict(t=20, b=20), template="plotly_white")
+        fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 160], tickvals=[0, 50, 100, 150], ticktext=['0%', '50%', 'TARGET', '150%'], tickfont=dict(size=10))), showlegend=True, height=500, margin=dict(t=20, b=20), template="plotly_white")
         st.plotly_chart(fig_radar, use_container_width=True)
 
     with col_table:
         st.markdown("""
             <style>
-                /* Colonne KPI (Index) */
+                /* Optimisation de la largeur des colonnes pour 3 KPIs */
                 [data-testid="stTable"] td:first-child {
                     white-space: nowrap !important;
-                    min-width: 70px !important;
+                    min-width: 60px !important;
                 }
-                /* Colonne Weighting */
-                [data-testid="stTable"] th:nth-child(4), 
-                [data-testid="stTable"] td:nth-child(3) {
-                    white-space: nowrap !important;
-                    min-width: 100px !important;
+                [data-testid="stTable"] td:nth-child(2) {
+                    min-width: 160px !important;
                 }
-                /* Colonne Impact */
                 [data-testid="stTable"] th:last-child, 
                 [data-testid="stTable"] td:last-child {
                     white-space: nowrap !important;
-                    min-width: 80px !important;
+                    min-width: 100px !important;
                 }
             </style>
         """, unsafe_allow_html=True)
         
-        breakdown_df = pd.DataFrame({"Pillar": categories, "Target Achievement": [f"{v*100:.1f}%" for v in r_values], "Weighting": ["30%", "20%", "20%", "15%", "15%"], "Impact": ["✅" if v >= 1.0 else "⚠️" for v in r_values]})
+        # Logique d'impact dynamique (r_values étant déjà sur 100)
+        impacts = []
+        for v in r_values:
+            if v >= 130: impacts.append("🚀 Exceptional")
+            elif v >= 100: impacts.append("✅ Achieved")
+            elif v >= 80: impacts.append("⚠️ Warning")
+            else: impacts.append("🚨 Critical")
+
+        # Construction du DataFrame avec les 3 piliers
+        breakdown_df = pd.DataFrame({
+            "Pillar": categories, 
+            "Achievement": [f"{v:.1f}%" for v in r_values], 
+            "Weighting": ["40%", "30%", "30%"], 
+            "Status": impacts
+        })
+        
+        # Indexation KPI 1 à 3
         breakdown_df.index = [f"KPI {i+1}" for i in range(len(breakdown_df))]
+        
         st.markdown("<br><br>", unsafe_allow_html=True)
-        st.markdown("**CHHI (Weighted average of 5 KPIs) Contribution Details**")     
+        st.markdown("**CHHI (Weighted average of 3 KPIs) Contribution Details**")     
+        
         st.table(breakdown_df)
-        st.info("⚠️ indicates it is performing below target and negatively contributing to the Global Human Capital Score (CHHI)")
+        
+        # Note explicative mise à jour
+        st.info("""
+            **Guide:** **Achievement > 100%**: Objective surpassed (exceeds the dashed line on the radar).  
+            * **Status ⚠️ or 🚨**: Indicator performing below strategic target.
+        """)
+
 
 # --- 6. PAGE 2 : KPI Interpretation ---
 elif app_mode == "Interpretation Guide":
