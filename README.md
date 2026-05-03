@@ -96,6 +96,21 @@ Global performance index based on weighted KPIs:
 * RE-Score → 15%
 * SPE → 15%
 
+7. WFRI — Workforce Future Readiness Index
+
+Measures the real operational readiness of the workforce to support future business challenges.
+
+WFRI = 0.4 × Completion Rate
+     + 0.3 × Trained Employee Rate
+     + 0.3 × Recent Training Rate
+
+Weighted WFRI = Σ (WFRI × Number of Employees) / Total Employees
+
+WFRI Score	Meaning
+< 40%	At Risk → Workforce not prepared
+40% – 70%	In Transition → Ongoing upskilling
+> 70%	Future-Ready → Workforce aligned with strategy
+
 Data Pipeline
 
 1. Raw data is processed in `Preprocessing.ipynb`
