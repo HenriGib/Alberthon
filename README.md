@@ -111,6 +111,27 @@ WFRI Score	Meaning
 40% – 70%	In Transition → Ongoing upskilling
 > 70%	Future-Ready → Workforce aligned with strategy
 
+8. LSR — License-to-Operate & Sustainability Resilience
+
+Measures social resilience: regulatory, human, and reputational risk exposure
+of the workforce (governance / ESG-S pillar).
+
+```
+LSR = (Mixité + Inclusion + Engagement) / 3
+```
+
+* Mixité     — pay gap + % women in management (Bilan Social + Suivi accord mixité)
+* Inclusion  — Baromètre D&I FR + Lux (weighted by headcount)
+* Engagement — participations FAB'Life + We Care + Be Generous / headcount
+
+LSR Score	Meaning
+< 60		At Risk → Material exposure to regulatory / reputational risk
+60 – 75		Yellow zone → Acceptable but improvable, action plan required
+> 75		Green zone → Strong social asset, low exposure
+
+LSR 2024 = 64.3/100 (yellow zone). Full methodology in `docs/LSR.md`,
+notebook in `LSR_KPI.ipynb`.
+
 Data Pipeline
 
 1. Raw data is processed in `Preprocessing.ipynb`
