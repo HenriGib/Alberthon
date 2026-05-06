@@ -46,7 +46,11 @@ def load_data():
             "hcva": "HCVA (k€)",
             "kti_potentiel": "KTI (%)",
             "re_score": "RE-Score",
-            "chhi_index_100": "CHHI Index"
+            "chhi_index_100": "CHHI Index",
+            "lsr": "LSR",                       # 8th KPI: License-to-Operate & Sustainability Resilience
+            "lsr_mixite": "LSR Mixité",
+            "lsr_inclusion": "LSR Inclusion",
+            "lsr_engagement": "LSR Engagement"
         })
         
         # Conversion KTI en % (seulement si la colonne existe après le rename)
@@ -118,7 +122,8 @@ if app_mode == "Live Dashboard":
         {"id": "KTI", "label": "KPI 2: Knowledge (KTI)", "col": "KTI (%)", "unit": "%", "target": 75, "rev": False, "is_master": False, "def": "Knowledge Transfer Index (KTI)", "val": "Training ROI and skill application.", "form": " Σ(Activation Scores) / Nb Responses", "logic": ">75% (Green) / >60% (Yellow) / <60% (Red)"},
         #{"id": "SD", "label": "KPI 3: Risk (Skill Decay)", "col": "Skill Decay (%)", "unit": "%", "target": 15, "rev": True, "is_master": False, "def": "Skill Decay Rate (Obsolescence Index)", "val": "Risk of expertise erosion.", "form": "% without training > 18 months", "logic": "<12% (Green) / <18% (Yellow) / >18% (Red)"},
         {"id": "RE", "label": "KPI 4: Resilience (RE-Score)", "col": "RE-Score", "unit": "/5", "target": 4.0, "rev": False, "is_master": False, "def": "Resilience & Engagement Score (RE-Score)", "val": "Workforce stability and morale.", "form": "Engagement / Absenteeism", "logic": ">4.0 (Green) / >3.2 (Yellow) / <3.2 (Red)"},
-        #{"id": "SPE", "label": "KPI 5: Strategy (SPE)", "col": "SPE (%)", "unit": "%", "target": 25, "rev": False, "is_master": False, "def": "Strategic Payroll Elasticity (SPE)", "val": "Agility towards future-proof jobs.", "form": "% payroll growth roles", "logic": ">25% (Green) / >20% (Yellow) / <20% (Red)"}
+        #{"id": "SPE", "label": "KPI 5: Strategy (SPE)", "col": "SPE (%)", "unit": "%", "target": 25, "rev": False, "is_master": False, "def": "Strategic Payroll Elasticity (SPE)", "val": "Agility towards future-proof jobs.", "form": "% payroll growth roles", "logic": ">25% (Green) / >20% (Yellow) / <20% (Red)"},
+        {"id": "LSR", "label": "KPI 8: Governance (LSR)", "col": "LSR", "unit": "%", "target": 75, "rev": False, "is_master": False, "def": "License-to-Operate & Sustainability Resilience (LSR)", "val": "Social resilience: regulatory, human and reputational risk exposure.", "form": "(Mixité + Inclusion + Engagement) / 3", "logic": ">75% (Green) / >60% (Yellow) / <60% (Red)"}
     ]
 
     st.markdown("---")
