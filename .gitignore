@@ -1,0 +1,3 @@
+# Source data files (CACEIS confidential)
+*.xlsx
+!outputs/*.xlsx

@@ -96,26 +96,36 @@ Global performance index based on weighted KPIs:
 * RE-Score → 15%
 * SPE → 15%
 
-7. LSR — License-to-Operate & Sustainability Resilience
-
-Measures social resilience: regulatory, human, and reputational risk exposure
-of the workforce (governance / ESG-S pillar).
+7. IGS — Indice de Gouvernance Sociale
+Measures social governance resilience: regulatory, human, and reputational
+risk exposure of the workforce (ESG-S pillar). Integrated into the CHHI
+calculation with a 20% weighting.
 
 ```
-LSR = (Mixité + Inclusion + Engagement) / 3
+IGS = mean(available components) — Mixité · Inclusion · Engagement
 ```
 
 * Mixité     — pay gap + % women in management (Bilan Social + Suivi accord mixité)
 * Inclusion  — Baromètre D&I FR + Lux (weighted by headcount)
 * Engagement — participations FAB'Life + We Care + Be Generous / headcount
 
-LSR Score	Meaning
-< 60		At Risk → Material exposure to regulatory / reputational risk
-60 – 75		Yellow zone → Acceptable but improvable, action plan required
-> 75		Green zone → Strong social asset, low exposure
+Each year uses **strictly its own sources**. Components without data for a given
+year are marked N/A, and the IGS averages only available components.
 
-LSR 2024 = 64.3/100 (yellow zone). Full methodology in `docs/LSR.md`,
-notebook in `LSR_KPI.ipynb`.
+| Year | Mixité | Inclusion | Engagement | IGS |
+|------|--------|-----------|------------|-----|
+| 2023 | 77.2   | N/A       | 32.4       | **54.8** |
+| 2024 | 76.5   | N/A       | 28.8       | **52.6** |
+| 2025 | N/A    | 67.1      | 20.7       | **43.9** |
+
+IGS Score	Meaning
+< 60		At Risk — Material exposure to regulatory / reputational risk
+60 – 75		Yellow zone — Acceptable but improvable, action plan required
+> 75		Green zone — Strong social asset, low exposure
+
+CHHI now integrates IGS at 20%: HCVA 30% / KTI 25% / RE 25% / **IGS 20%**.
+
+Full methodology in `docs/IGS.md`, notebook in `IGS_KPI.ipynb`.
 
 Data Pipeline
 

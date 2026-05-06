@@ -47,10 +47,11 @@ def load_data():
             "kti_potentiel": "KTI (%)",
             "re_score": "RE-Score",
             "chhi_index_100": "CHHI Index",
-            "lsr": "LSR",                       # 8th KPI: License-to-Operate & Sustainability Resilience
-            "lsr_mixite": "LSR Mixité",
-            "lsr_inclusion": "LSR Inclusion",
-            "lsr_engagement": "LSR Engagement"
+            "igs": "IGS",                       # KPI 4: Indice de Gouvernance Sociale
+            "igs_mixite": "IGS Mixité",
+            "igs_inclusion": "IGS Inclusion",
+            "igs_engagement": "IGS Engagement",
+            "igs_radar": "igs_radar"
         })
         
         # Conversion KTI en % (seulement si la colonne existe après le rename)
@@ -121,9 +122,9 @@ if app_mode == "Live Dashboard":
         {"id": "HCVA", "label": "KPI 1: Productivity (HCVA)", "col": "HCVA (k€)", "unit": "k€", "target": 200, "rev": False, "is_master": False, "def": "Human Capital Value Added (HCVA) per FTE", "val": "Financial efficiency of human capital.", "form": "[GNP - (OpEx-Payroll)]/FTE", "logic": ">200k€ (Green) / >160k€ (Yellow) / <160k€ (Red)"},
         {"id": "KTI", "label": "KPI 2: Knowledge (KTI)", "col": "KTI (%)", "unit": "%", "target": 75, "rev": False, "is_master": False, "def": "Knowledge Transfer Index (KTI)", "val": "Training ROI and skill application.", "form": " Σ(Activation Scores) / Nb Responses", "logic": ">75% (Green) / >60% (Yellow) / <60% (Red)"},
         #{"id": "SD", "label": "KPI 3: Risk (Skill Decay)", "col": "Skill Decay (%)", "unit": "%", "target": 15, "rev": True, "is_master": False, "def": "Skill Decay Rate (Obsolescence Index)", "val": "Risk of expertise erosion.", "form": "% without training > 18 months", "logic": "<12% (Green) / <18% (Yellow) / >18% (Red)"},
-        {"id": "RE", "label": "KPI 4: Resilience (RE-Score)", "col": "RE-Score", "unit": "/5", "target": 4.0, "rev": False, "is_master": False, "def": "Resilience & Engagement Score (RE-Score)", "val": "Workforce stability and morale.", "form": "Engagement / Absenteeism", "logic": ">4.0 (Green) / >3.2 (Yellow) / <3.2 (Red)"},
+        {"id": "RE", "label": "KPI 3: Resilience (RE-Score)", "col": "RE-Score", "unit": "/5", "target": 4.0, "rev": False, "is_master": False, "def": "Resilience & Engagement Score (RE-Score)", "val": "Workforce stability and morale.", "form": "Engagement / Absenteeism", "logic": ">4.0 (Green) / >3.2 (Yellow) / <3.2 (Red)"},
         #{"id": "SPE", "label": "KPI 5: Strategy (SPE)", "col": "SPE (%)", "unit": "%", "target": 25, "rev": False, "is_master": False, "def": "Strategic Payroll Elasticity (SPE)", "val": "Agility towards future-proof jobs.", "form": "% payroll growth roles", "logic": ">25% (Green) / >20% (Yellow) / <20% (Red)"},
-        {"id": "LSR", "label": "KPI 8: Governance (LSR)", "col": "LSR", "unit": "%", "target": 75, "rev": False, "is_master": False, "def": "License-to-Operate & Sustainability Resilience (LSR)", "val": "Social resilience: regulatory, human and reputational risk exposure.", "form": "(Mixité + Inclusion + Engagement) / 3", "logic": ">75% (Green) / >60% (Yellow) / <60% (Red)"}
+        {"id": "IGS", "label": "KPI 4: Governance (IGS)", "col": "IGS", "unit": "%", "target": 75, "rev": False, "is_master": False, "def": "Indice de Gouvernance Sociale (IGS)", "val": "Social governance resilience: regulatory, human and reputational risk.", "form": "Mean(available components) — Mixité · Inclusion · Engagement", "logic": ">75% (Green) / >60% (Yellow) / <60% (Red)"}
     ]
 
     st.markdown("---")
@@ -199,17 +200,17 @@ if app_mode == "Live Dashboard":
     col_radar, col_table = st.columns([2, 1.2])
 
     with col_radar:
-        categories = ['Productivity (HCVA)', 'Knowledge (KTI)', 'Resilience (RE-Score)']
-        #categories = ['Productivity (HCVA)', 'Knowledge (KTI)', 'Risk (Skill Decay)', 'Resilience (RE-Score)', 'Strategy (SPE)']
+        categories = ['Productivity (HCVA)', 'Knowledge (KTI)', 'Resilience (RE-Score)', 'Governance (IGS)']
         r_values = [
             df_current['hcva_radar'].values[0],
             df_current['kti_radar'].values[0],
-            df_current['re_radar'].values[0]
+            df_current['re_radar'].values[0],
+            df_current['igs_radar'].values[0] if 'igs_radar' in df_current.columns else 0
         ]
 
         fig_radar = go.Figure()
-        # Ligne de cible (Target) fixe à 100%
-        fig_radar.add_trace(go.Scatterpolar(r=[100, 100, 100, 100], theta=categories + [categories[0]], fill='toself', fillcolor='rgba(136, 139, 141, 0.05)', line=dict(color=CACEIS_RED, dash='dash'), name='Target Threshold (100%)'))
+        # Ligne de cible (Target) fixe à 100% — 5 points (4 + retour au 1er)
+        fig_radar.add_trace(go.Scatterpolar(r=[100]*5, theta=categories + [categories[0]], fill='toself', fillcolor='rgba(136, 139, 141, 0.05)', line=dict(color=CACEIS_RED, dash='dash'), name='Target Threshold (100%)'))
         # Performance Réelle (peut dépasser 100)
         fig_radar.add_trace(go.Scatterpolar(r=r_values + [r_values[0]], theta=categories + [categories[0]], fill='toself', fillcolor='rgba(136, 139, 141, 0.4)', line=dict(color=CACEIS_GREY, width=3), name='Actual Performance'))
         fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 160], tickvals=[0, 50, 100, 150], ticktext=['0%', '50%', 'TARGET', '150%'], tickfont=dict(size=10))), showlegend=True, height=500, margin=dict(t=20, b=20), template="plotly_white")
@@ -242,19 +243,19 @@ if app_mode == "Live Dashboard":
             elif v >= 80: impacts.append("⚠️ Warning")
             else: impacts.append("🚨 Critical")
 
-        # Construction du DataFrame avec les 3 piliers
+        # Construction du DataFrame avec les 4 piliers (HCVA · KTI · RE · IGS)
         breakdown_df = pd.DataFrame({
-            "Pillar": categories, 
-            "Achievement": [f"{v:.1f}%" for v in r_values], 
-            "Weighting": ["40%", "30%", "30%"], 
+            "Pillar": categories,
+            "Achievement": [f"{v:.1f}%" for v in r_values],
+            "Weighting": ["30%", "25%", "25%", "20%"],
             "Status": impacts
         })
-        
-        # Indexation KPI 1 à 3
+
+        # Indexation KPI 1 à 4
         breakdown_df.index = [f"KPI {i+1}" for i in range(len(breakdown_df))]
-        
+
         st.markdown("<br><br>", unsafe_allow_html=True)
-        st.markdown("**CHHI (Weighted average of 3 KPIs) Contribution Details**")     
+        st.markdown("**CHHI (Weighted average of 4 KPIs) Contribution Details**")
         
         st.table(breakdown_df)
         
