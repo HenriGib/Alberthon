@@ -46,7 +46,11 @@ def load_data():
             "hcva": "HCVA (k€)",
             "kti_potentiel": "KTI (%)",
             "re_score": "RE-Score",
-            "chhi_index_100": "CHHI Index"
+            "chhi_index_100": "CHHI Index",
+            "lsr": "LSR",
+            "lsr_mixite": "LSR Mixity",
+            "lsr_inclusion": "LSR Inclusion",
+            "lsr_engagement": "LSR Engagement"
         })
         
         # Conversion KTI en % (seulement si la colonne existe après le rename)
@@ -57,15 +61,24 @@ def load_data():
             # On multiplie par 100 si c'est un ratio (ex: 0.82)
             if df_final["KTI (%)"].max() <= 1.5: # On prend une marge
                 df_final["KTI (%)"] = df_final["KTI (%)"] * 100
+
+        # LSR is computed in LSR_KPI.ipynb for 2024 only.
+        # If the central CSV has not been enriched yet, Streamlit still displays the validated KPI.
+        lsr_metrics, _ = compute_lsr_metrics()
+        lsr_columns = {
+            "LSR": lsr_metrics["LSR"],
+            "LSR Mixity": lsr_metrics["Mixity"],
+            "LSR Inclusion": lsr_metrics["Inclusion"],
+            "LSR Engagement": lsr_metrics["Engagement"],
+        }
+        for col, value in lsr_columns.items():
+            if col not in df_final.columns:
+                df_final[col] = np.where(df_final["Year"].astype(int).eq(2024), value, 0.0)
         
         return df_final.round(2)
     else:
         st.error(f"Fichier '{file_path}' non trouvé.")
         return pd.DataFrame()
-
-# Chargement
-df = load_data()
-
 
 # --- 3. FONCTIONS D'AIDE ---
 def get_trend_ui(curr, prev, is_reverse=False, has_prev=True):
@@ -90,6 +103,79 @@ def get_bg_color(value, target, is_reverse=False, is_master=False):
         return f"rgba(214, 80, 99, {alpha})"
 
 @st.cache_data
+def compute_lsr_metrics():
+    sab_moyen_femmes_fr = 54_753
+    sab_moyen_hommes_fr = 60_360
+    cadres_encadrants_2024 = {
+        "H": (0, 2),
+        "I": (10, 25),
+        "J": (21, 20),
+        "K": (25, 33),
+        "HC": (41, 67),
+    }
+    barometre_fr_pct = 70.0
+    barometre_lux_pct = 64.0
+    effectif_fr = 2_043
+    effectif_lux = 1_882
+    fab_life_participations_caceis = 2_984 - 743
+    we_care_participations_chiffrees = 1_256
+    we_care_lignes_na = 14
+    we_care_fallback_par_na = 24
+    be_generous_laureats_caceis = 34
+
+    gap_pct = (sab_moyen_hommes_fr - sab_moyen_femmes_fr) / sab_moyen_hommes_fr * 100
+    score_paygap = max(0, 100 - abs(gap_pct) * 5)
+
+    total_f_encadrants = sum(f for f, h in cadres_encadrants_2024.values())
+    total_h_encadrants = sum(h for f, h in cadres_encadrants_2024.values())
+    total_encadrants = total_f_encadrants + total_h_encadrants
+    pct_femmes_mgt = total_f_encadrants / total_encadrants * 100
+    score_mgt = min(100, pct_femmes_mgt / 40 * 100)
+    score_mixity = (score_paygap + score_mgt) / 2
+
+    score_inclusion = (
+        barometre_fr_pct * effectif_fr +
+        barometre_lux_pct * effectif_lux
+    ) / (effectif_fr + effectif_lux)
+
+    we_care_total = we_care_participations_chiffrees + we_care_lignes_na * we_care_fallback_par_na
+    total_participations = (
+        fab_life_participations_caceis +
+        we_care_total +
+        be_generous_laureats_caceis
+    )
+    effectif_total = effectif_fr + effectif_lux
+    intensity = total_participations / effectif_total
+    score_engagement = min(100, intensity * 50)
+    lsr = (score_mixity + score_inclusion + score_engagement) / 3
+
+    sensitivity = []
+    for fallback in (0, 12, 24, 36, 48):
+        we_care_var = we_care_participations_chiffrees + we_care_lignes_na * fallback
+        total_var = fab_life_participations_caceis + we_care_var + be_generous_laureats_caceis
+        score_eng_var = min(100, (total_var / effectif_total) * 50)
+        lsr_var = (score_mixity + score_inclusion + score_eng_var) / 3
+        sensitivity.append({
+            "Fallback participants": fallback,
+            "We Care total": we_care_var,
+            "Engagement": round(score_eng_var, 1),
+            "LSR": round(lsr_var, 1),
+        })
+
+    metrics = {
+        "Year": 2024,
+        "LSR": round(lsr, 2),
+        "Mixity": round(score_mixity, 2),
+        "Inclusion": round(score_inclusion, 2),
+        "Engagement": round(score_engagement, 2),
+        "Pay gap": round(gap_pct, 2),
+        "Women managers": round(pct_femmes_mgt, 2),
+        "Engagement intensity": round(intensity, 3),
+        "Headcount": effectif_total,
+    }
+    return metrics, pd.DataFrame(sensitivity)
+
+@st.cache_data
 def load_ml_workbook(file_path):
     return {
         "model_selection": pd.read_excel(file_path, sheet_name="model_selection"),
@@ -105,6 +191,9 @@ def load_ml_workbook(file_path):
 def load_ml_dataset(file_path):
     return pd.read_csv(file_path)
 
+# Chargement
+df = load_data()
+
 # --- 4. NAVIGATION & LOGO ---
 logo_path = "CACEIS_Investor_Services_logo.png" 
 if os.path.exists(logo_path):
@@ -114,7 +203,7 @@ else:
 
 st.sidebar.markdown("<br>", unsafe_allow_html=True)
 st.sidebar.title("Navigation")
-app_mode = st.sidebar.radio("Go to:", ["Live Dashboard", "Machine Learning", "Interpretation Guide", "2023 RBC Integration"])
+app_mode = st.sidebar.radio("Go to:", ["Live Dashboard", "LSR Governance KPI", "Machine Learning", "Interpretation Guide", "2023 RBC Integration"])
 
 # --- 5. PAGE 1 : LIVE DASHBOARD ---
 if app_mode == "Live Dashboard":
@@ -133,7 +222,8 @@ if app_mode == "Live Dashboard":
         {"id": "HCVA", "label": "KPI 1: Productivity (HCVA)", "col": "HCVA (k€)", "unit": "k€", "target": 200, "rev": False, "is_master": False, "def": "Human Capital Value Added (HCVA) per FTE", "val": "Financial efficiency of human capital.", "form": "[GNP - (OpEx-Payroll)]/FTE", "logic": ">200k€ (Green) / >160k€ (Yellow) / <160k€ (Red)"},
         {"id": "KTI", "label": "KPI 2: Knowledge (KTI)", "col": "KTI (%)", "unit": "%", "target": 75, "rev": False, "is_master": False, "def": "Knowledge Transfer Index (KTI)", "val": "Training ROI and skill application.", "form": " Σ(Activation Scores) / Nb Responses", "logic": ">75% (Green) / >60% (Yellow) / <60% (Red)"},
         #{"id": "SD", "label": "KPI 3: Risk (Skill Decay)", "col": "Skill Decay (%)", "unit": "%", "target": 15, "rev": True, "is_master": False, "def": "Skill Decay Rate (Obsolescence Index)", "val": "Risk of expertise erosion.", "form": "% without training > 18 months", "logic": "<12% (Green) / <18% (Yellow) / >18% (Red)"},
-        {"id": "RE", "label": "KPI 4: Resilience (RE-Score)", "col": "RE-Score", "unit": "/5", "target": 4.0, "rev": False, "is_master": False, "def": "Resilience & Engagement Score (RE-Score)", "val": "Workforce stability and morale.", "form": "Engagement / Absenteeism", "logic": ">4.0 (Green) / >3.2 (Yellow) / <3.2 (Red)"},
+        {"id": "RE", "label": "KPI 3: Resilience (RE-Score)", "col": "RE-Score", "unit": "/5", "target": 4.0, "rev": False, "is_master": False, "def": "Resilience & Engagement Score (RE-Score)", "val": "Workforce stability and morale.", "form": "Engagement / Absenteeism", "logic": ">4.0 (Green) / >3.2 (Yellow) / <3.2 (Red)"},
+        {"id": "LSR", "label": "KPI 4: Governance (LSR)", "col": "LSR", "unit": "%", "target": 75, "rev": False, "is_master": False, "def": "License-to-Operate & Sustainability Resilience", "val": "Social resilience against regulatory, human and reputational risks.", "form": "(Mixity + Inclusion + Engagement) / 3", "logic": ">75% (Green) / >60% (Yellow) / <60% (Red)"},
         #{"id": "SPE", "label": "KPI 5: Strategy (SPE)", "col": "SPE (%)", "unit": "%", "target": 25, "rev": False, "is_master": False, "def": "Strategic Payroll Elasticity (SPE)", "val": "Agility towards future-proof jobs.", "form": "% payroll growth roles", "logic": ">25% (Green) / >20% (Yellow) / <20% (Red)"}
     ]
 
@@ -204,6 +294,8 @@ if app_mode == "Live Dashboard":
                     <hr style="margin: 10px 0;">
                     <p style="font-size: 12px;"><strong>Target Logic:</strong><br>{conf['logic']}</p>
                 </div>""", unsafe_allow_html=True)
+                if conf["id"] == "LSR" and selected_year != 2024:
+                    st.warning("LSR is currently calculated only for 2024, based on available governance sources.")
 
     st.markdown("---")
     st.subheader("Global Human Capital Score: Radar & Pillar Breakdown")
@@ -276,7 +368,137 @@ if app_mode == "Live Dashboard":
         """)
 
 
-# --- 6. PAGE 2 : MACHINE LEARNING ---
+# --- 6. PAGE 2 : LSR GOVERNANCE KPI ---
+elif app_mode == "LSR Governance KPI":
+    st.title("LSR Governance KPI")
+    st.markdown("""
+    **LSR** stands for **License-to-Operate & Sustainability Resilience**.
+    It is a governance KPI that measures CACEIS' social resilience against
+    regulatory, human and reputational risks.
+
+    The KPI is calculated for **2024**, using official governance and HR sources.
+    """)
+
+    lsr_metrics, lsr_sensitivity = compute_lsr_metrics()
+
+    score = lsr_metrics["LSR"]
+    if score >= 75:
+        zone = "Green zone"
+        zone_color = "#28a745"
+        zone_comment = "Strong social resilience."
+    elif score >= 60:
+        zone = "Yellow zone"
+        zone_color = "#ffc107"
+        zone_comment = "Acceptable but requires monitoring and targeted action."
+    else:
+        zone = "Red zone"
+        zone_color = CACEIS_RED
+        zone_comment = "Social resilience risk requiring immediate action."
+
+    top_cols = st.columns([1, 1, 1, 1])
+    top_cols[0].metric("LSR 2024", f"{score:.1f}/100")
+    top_cols[1].metric("Mixity", f"{lsr_metrics['Mixity']:.1f}/100")
+    top_cols[2].metric("Inclusion", f"{lsr_metrics['Inclusion']:.1f}/100")
+    top_cols[3].metric("Engagement", f"{lsr_metrics['Engagement']:.1f}/100")
+
+    st.markdown(f"""
+    <div style="border-left:6px solid {zone_color}; background-color:#f9f9f9; padding:16px; border-radius:8px; margin:12px 0 22px 0;">
+        <h4 style="margin:0; color:{CACEIS_STEEL_BLUE};">Board reading: {zone}</h4>
+        <p style="margin:8px 0 0 0;">{zone_comment}</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.subheader("How the KPI is calculated")
+    st.markdown("""
+    The LSR score is the average of three dimensions:
+
+    ```
+    LSR = (Mixity + Inclusion + Engagement) / 3
+    ```
+    """)
+
+    components = pd.DataFrame({
+        "Component": ["Mixity", "Inclusion", "Engagement", "LSR"],
+        "Score": [
+            lsr_metrics["Mixity"],
+            lsr_metrics["Inclusion"],
+            lsr_metrics["Engagement"],
+            lsr_metrics["LSR"],
+        ],
+        "Business meaning": [
+            "Gender equity: pay gap and women in management",
+            "Feeling of inclusion from France and Luxembourg D&I barometers",
+            "Participation intensity in social programmes",
+            "Overall governance and social resilience score",
+        ],
+    })
+
+    col_chart, col_table = st.columns([1.2, 1])
+    with col_chart:
+        fig_lsr = px.bar(
+            components,
+            x="Component",
+            y="Score",
+            text="Score",
+            color="Component",
+            color_discrete_sequence=[CACEIS_GREY_BLUE, CACEIS_STEEL_BLUE, "#E0A526", CACEIS_RED],
+        )
+        fig_lsr.add_hline(y=75, line_dash="dash", line_color="#28a745", annotation_text="Green target: 75")
+        fig_lsr.add_hline(y=60, line_dash="dash", line_color="#E0A526", annotation_text="Yellow threshold: 60")
+        fig_lsr.update_traces(texttemplate="%{text:.1f}", textposition="outside")
+        fig_lsr.update_layout(
+            template="plotly_white",
+            height=430,
+            margin=dict(l=20, r=20, t=30, b=20),
+            yaxis_title="Score (/100)",
+            showlegend=False,
+        )
+        fig_lsr.update_yaxes(range=[0, 100])
+        st.plotly_chart(fig_lsr, use_container_width=True)
+
+    with col_table:
+        st.dataframe(components, use_container_width=True, hide_index=True)
+        st.markdown("""
+        **Simple interpretation**
+
+        Mixity is close to target, inclusion is acceptable, but engagement is the main weakness.
+        The final LSR score is therefore in the yellow zone.
+        """)
+
+    st.subheader("Key drivers")
+    driver_cols = st.columns(3)
+    driver_cols[0].metric("Pay gap", f"{lsr_metrics['Pay gap']:.1f}%")
+    driver_cols[1].metric("Women managers", f"{lsr_metrics['Women managers']:.1f}%")
+    driver_cols[2].metric("Engagement intensity", f"{lsr_metrics['Engagement intensity']:.2f} participation / employee")
+
+    st.subheader("Sensitivity check")
+    st.markdown("""
+    The only explicit assumption is the fallback used for We Care rows marked as `n/a`.
+    The sensitivity test shows that the final conclusion remains stable.
+    """)
+    fig_sensitivity = px.line(
+        lsr_sensitivity,
+        x="Fallback participants",
+        y="LSR",
+        markers=True,
+        color_discrete_sequence=[CACEIS_STEEL_BLUE],
+    )
+    fig_sensitivity.add_hrect(y0=60, y1=75, fillcolor="#E0A526", opacity=0.12, line_width=0)
+    fig_sensitivity.add_hrect(y0=75, y1=100, fillcolor="#28a745", opacity=0.10, line_width=0)
+    fig_sensitivity.add_vline(x=24, line_dash="dash", line_color=CACEIS_RED, annotation_text="Retained fallback")
+    fig_sensitivity.update_layout(
+        template="plotly_white",
+        height=360,
+        margin=dict(l=20, r=20, t=30, b=20),
+        yaxis_title="LSR score (/100)",
+    )
+    fig_sensitivity.update_yaxes(range=[55, 75])
+    st.plotly_chart(fig_sensitivity, use_container_width=True)
+
+    st.caption("Source notebook: LSR_KPI.ipynb. The KPI is displayed without requiring private source documents in GitHub.")
+
+
+# --- 7. PAGE 3 : MACHINE LEARNING ---
 elif app_mode == "Machine Learning":
     st.title("Machine Learning: Monthly HR Segmentation")
 
